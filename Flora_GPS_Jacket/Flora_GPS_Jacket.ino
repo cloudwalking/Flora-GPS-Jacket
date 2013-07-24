@@ -54,20 +54,6 @@ boolean isStarted = false;
 Adafruit_FloraPixel strip = Adafruit_FloraPixel(2);
 
 
-uint8_t LED_Breathe_Table[]  = {   80,  87,  95, 103, 112, 121, 131, 141, 151, 161, 172, 182, 192, 202, 211, 220,
-              228, 236, 242, 247, 251, 254, 255, 255, 254, 251, 247, 242, 236, 228, 220, 211,
-              202, 192, 182, 172, 161, 151, 141, 131, 121, 112, 103,  95,  87,  80,  73,  66,
-               60,  55,  50,  45,  41,  38,  34,  31,  28,  26,  24,  22,  20,  20,  20,  20,
-               20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,
-               20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  22,  24,  26,  28,
-               31,  34,  38,  41,  45,  50,  55,  60,  66,  73 };
-
-
-#define BREATHE_TABLE_SIZE (sizeof(LED_Breathe_Table))
-#define BREATHE_CYCLE    5000      /*breathe cycle in milliseconds*/
-#define BREATHE_UPDATE    (BREATHE_CYCLE / BREATHE_TABLE_SIZE)
-uint32_t lastBreatheUpdate = 0;
-uint8_t breatheIndex = 0;
 
 void setup()  
 {
@@ -317,30 +303,45 @@ float decimalDegrees(float nmeaCoord, char dir) {
   return (wholeDegrees + (nmeaCoord - 100.0*wholeDegrees)/60.0) * modifier;
 }
 
-void breath()
-{
-  uniformBreathe(LED_Breathe_Table, BREATHE_TABLE_SIZE, BREATHE_UPDATE, 127, 127, 127);
-}
+// Breathing LEDs
 
-void uniformBreathe(uint8_t* breatheTable, uint8_t breatheTableSize, uint16_t updatePeriod, uint16_t r, uint16_t g, uint16_t b)
-{
-  int i;
+// Customize to set breathing cycle length.
+// 5000 = 5 second breathing cycle
+const int BREATHE_CYCLE_MILLISECONDS = 5000;
 
-  uint8_t breatheBlu;
+
+const uint8_t KEYFRAMES[]  = {
+  // Up
+  20, 21, 22, 24, 26, 28, 31, 34, 38, 41, 45, 50, 55, 60, 66, 73, 80, 87, 95,
+  103, 112, 121, 131, 141, 151, 161, 172, 182, 192, 202, 211, 220, 228, 236,
+  242, 247, 251, 254, 255,
+  // Down
+  254, 251, 247, 242, 236, 228, 220, 211, 202, 192, 182, 172, 161, 151, 141,
+  131, 121, 112, 103, 95, 87, 80, 73, 66, 60, 55, 50, 45, 41, 38, 34, 31, 28,
+  26, 24, 22, 21, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20
+};
+
+unsigned long timeLastBreath = 0.0;
+int keyframePointer = 0;
+
+void breath() {
+  int numKeyframes = sizeof(KEYFRAMES) - 1;
+  float period = BREATHE_CYCLE_MILLISECONDS / numKeyframes;
+  unsigned long timeNow = millis();
   
-  if ((millis() - lastBreatheUpdate) > updatePeriod) {
-    lastBreatheUpdate = millis();
+  if ((timeNow - timeLastBreath) > period) {
+    timeLastBreath = timeNow;
 
-    
-    for (i=0; i < strip.numPixels(); i++) {
-      breatheBlu = (b * breatheTable[breatheIndex]) / 256;
-      strip.setPixelColor(i, 0, 0, breatheBlu);
+    for (int i = 0; i < strip.numPixels(); i++) {
+      uint8_t color = (127 * KEYFRAMES[keyframePointer]) / 256;
+      strip.setPixelColor(i, color, 0, 0);
     }
     strip.show();   
-    
-    breatheIndex++;
-    if (breatheIndex > breatheTableSize) {
-      breatheIndex = 0;
+
+    // Increment the keyframe pointer.
+    if (++keyframePointer > numKeyframes) {
+      // Reset to 0 after the last keyframe.
+      keyframePointer = 0;
     }   
   }
 }
